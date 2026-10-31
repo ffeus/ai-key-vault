@@ -24,9 +24,11 @@
 
 ## 使用
 
-**Windows**：双击 `AI-Key管家.exe`。第一次运行如果出现蓝色的「Windows 已保护你的电脑」，点「更多信息」→「仍要运行」（程序没有付费签名，所以会有这个提示）。
+到 [Releases](https://github.com/ffeus/ai-key-vault/releases/latest) 下载对应系统的文件：
 
-**macOS**：双击 `AI-Key管家-mac`。如果提示「无法验证开发者」，在文件上右键 →「打开」→「打开」。
+**Windows**：下载 `AI-Key-Vault-windows-x64.exe`，双击运行。第一次运行如果出现蓝色的「Windows 已保护你的电脑」，点「更多信息」→「仍要运行」（程序没有付费签名，所以会有这个提示）。
+
+**macOS（Apple 芯片）**：下载 `AI-Key-Vault-mac-arm64.zip`，解压后双击 `AI-Key管家-mac`。如果提示「无法验证开发者」，在文件上右键 →「打开」→「打开」。
 
 运行后会自动在浏览器里打开管理页面。用完关掉那个黑色的命令行窗口即可退出。
 
