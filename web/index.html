@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Key 管家</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23134e4a'/%3E%3Ccircle cx='12' cy='16' r='5' fill='none' stroke='%23fff' stroke-width='2.5'/%3E%3Cpath d='M17 16h9v4M22 16v3' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f5f4ef; --panel:#ffffff; --ink:#1c1b19; --ink2:#5c5a54; --ink3:#8f8c84; --line:#e6e3da;
+  --brand:#134e4a; --brand2:#0f766e; --brandbg:#e6f2f0;
+  --ok:#15803d; --okbg:#e8f5ec; --bad:#b42318; --badbg:#fdecea; --warn:#a15c07; --warnbg:#fdf3e1;
+  --mono: "JetBrains Mono", Consolas, "SF Mono", Menlo, monospace;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+.hidden{display:none!important}
+
+/* ── 锁屏 ── */
+.gate{min-height:100vh;display:grid;place-items:center;padding:24px}
+.gate-card{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:36px 32px;box-shadow:0 10px 40px rgba(28,27,25,.06)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:.2px}
+.logo-mark{width:32px;height:32px;border-radius:8px;background:var(--brand);display:grid;place-items:center}
+.gate h1{font-size:22px;margin:26px 0 6px}
+.gate p{color:var(--ink2);margin:0 0 22px}
+.field{display:block;margin-bottom:14px}
+.field span{display:block;font-size:13px;color:var(--ink2);margin-bottom:6px}
+.input{width:100%;border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 12px;outline:none;transition:border-color .15s, box-shadow .15s}
+.input:focus{border-color:var(--brand2);box-shadow:0 0 0 3px rgba(15,118,110,.12)}
+textarea.input{font-family:var(--mono);font-size:13px;resize:vertical;min-height:64px}
+.err{color:var(--bad);font-size:13px;min-height:20px;margin:-4px 0 10px}
+.hint{font-size:12.5px;color:var(--ink3);margin-top:16px;line-height:1.6}
+
+.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:8px 14px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:background .15s,border-color .15s}
+.btn:hover{background:#faf9f6;border-color:#d6d2c6}
+.btn:disabled{opacity:.55;cursor:default}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:#0e3f3c}
+.btn.danger{color:var(--bad)}
+.btn.block{width:100%;justify-content:center;padding:11px}
+.btn.sm{padding:5px 10px;font-size:13px}
+.icon-btn{border:0;background:transparent;color:var(--ink3);width:28px;height:28px;border-radius:6px;display:inline-grid;place-items:center}
+.icon-btn:hover{background:#f0eee8;color:var(--ink)}
+
+/* ── 主界面 ── */
+.top{position:sticky;top:0;z-index:5;background:rgba(245,244,239,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1180px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+.wrap{max-width:1180px;margin:0 auto;padding:24px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.stat .k{font-size:12.5px;color:var(--ink3)}
+.stat .v{font-size:24px;font-weight:650;margin-top:2px;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.stat .v small{font-size:13px;font-weight:500;color:var(--ink2);margin-left:2px}
+.stat.alert .v{color:var(--bad)}
+.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.toolbar .search{flex:1;min-width:200px;position:relative}
+.toolbar .search input{padding-left:34px}
+.toolbar .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink3)}
+.toolbar select.input{width:auto;min-width:150px}
+
+.list{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.row{display:grid;grid-template-columns:minmax(170px,1.3fr) minmax(200px,1.5fr) 110px 120px 110px 168px;gap:14px;align-items:center;padding:14px 18px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row.head{background:#faf9f5;font-size:12px;color:var(--ink3);padding-top:10px;padding-bottom:10px}
+.row:not(.head):hover{background:#fcfbf8}
+.prov{display:flex;align-items:center;gap:10px;min-width:0}
+.dot{width:30px;height:30px;border-radius:8px;flex:none;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px}
+.prov .t{min-width:0}
+.prov .n{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prov .s{font-size:12.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.keycell{display:flex;align-items:center;gap:2px;min-width:0}
+.keycell code{font-family:var(--mono);font-size:12.5px;background:#f4f2ec;border-radius:6px;padding:3px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.keycell code.revealed{background:var(--warnbg);color:#6b3d00}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;border-radius:99px;padding:2px 9px;white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill.valid{color:var(--ok);background:var(--okbg)}
+.pill.invalid{color:var(--bad);background:var(--badbg)}
+.pill.neterr,.pill.error{color:var(--warn);background:var(--warnbg)}
+.pill.none,.pill.unsupported{color:var(--ink3);background:#f1efe9}
+.bal{font-variant-numeric:tabular-nums;font-weight:600}
+.bal.low{color:var(--warn)}
+.sub{font-size:12px;color:var(--ink3)}
+.exp.soon{color:var(--warn);font-weight:600}
+.exp.past{color:var(--bad);font-weight:600}
+.acts{display:flex;justify-content:flex-end;gap:2px}
+
+.empty{padding:56px 24px;text-align:center}
+.empty h3{margin:0 0 6px;font-size:18px}
+.empty p{color:var(--ink2);margin:0 0 22px}
+.empty .opts{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.opt{width:250px;display:flex;flex-direction:column;justify-content:flex-start;text-align:left;border:1px solid var(--line);border-radius:12px;padding:18px;background:#fff}
+.opt:hover{border-color:var(--brand2);background:var(--brandbg)}
+.opt b{display:block;margin-bottom:4px}
+.opt span{font-size:13px;color:var(--ink2)}
+
+/* ── 弹窗 ── */
+.mask{position:fixed;inset:0;background:rgba(28,27,25,.35);display:grid;place-items:center;padding:24px;z-index:20}
+.modal{background:var(--panel);border-radius:14px;width:100%;max-width:520px;max-height:calc(100vh - 48px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.18)}
+.modal.wide{max-width:760px}
+.modal header{padding:18px 22px 4px;display:flex;justify-content:space-between;align-items:center}
+.modal header h2{margin:0;font-size:17px}
+.modal .body{padding:12px 22px;overflow:auto}
+.modal footer{padding:14px 22px 18px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--line);margin-top:6px}
+.detected{font-size:12.5px;color:var(--brand2);margin:-8px 0 12px;min-height:18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.scan-prog{background:#faf9f5;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:13px}
+.scan-prog .cur{font-family:var(--mono);font-size:11.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
+.bar{height:4px;border-radius:4px;background:#ebe8df;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;width:30%;background:var(--brand2);border-radius:4px;animation:slide 1.2s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(340%)}}
+.found{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.frow{display:grid;grid-template-columns:28px 1fr 150px;gap:10px;align-items:start;padding:10px 12px;border-top:1px solid var(--line);font-size:13px}
+.frow:first-child{border-top:0}
+.frow.dim{opacity:.5}
+.frow code{font-family:var(--mono);font-size:12.5px}
+.frow .locs{font-family:var(--mono);font-size:11.5px;color:var(--ink3);word-break:break-all;margin-top:2px}
+
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1c1b19;color:#fff;padding:9px 16px;border-radius:8px;font-size:13.5px;z-index:40;box-shadow:0 8px 24px rgba(0,0,0,.2);transition:opacity .2s}
+.spin{width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:rot .7s linear infinite;display:inline-block}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+@media (max-width:900px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .row{grid-template-columns:1fr 1fr;row-gap:8px}
+  .row.head{display:none}
+  .acts{grid-column:1/-1;justify-content:flex-start}
+}
+</style>
+</head>
+<body>
+
+<!-- 锁屏：创建 / 解锁 -->
+<section id="gate" class="gate hidden">
+  <div class="gate-card">
+    <div class="logo"><div class="logo-mark"><svg width="18" height="18" viewBox="0 0 32 32"><circle cx="12" cy="16" r="5" fill="none" stroke="#fff" stroke-width="3"/><path d="M17 16h9v4M22 16v3" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/></svg></div>AI Key 管家</div>
+    <form id="setupForm" class="hidden">
+      <h1>先设一个主密码</h1>
+      <p>所有 key 会用它加密后保存在这台电脑上。</p>
+      <label class="field"><span>主密码（至少 8 位）</span><input class="input" type="password" id="pw1" autocomplete="new-password" required></label>
+      <label class="field"><span>再输一次</span><input class="input" type="password" id="pw2" autocomplete="new-password" required></label>
+      <div class="err" id="setupErr"></div>
+      <button class="btn primary block" type="submit">创建保险箱</button>
+      <div class="hint">⚠️ 主密码忘了就打不开保险箱，没有找回办法（也没有人能帮你找回）。建议存进手机的密码管理器。</div>
+    </form>
+    <form id="unlockForm" class="hidden">
+      <h1>解锁</h1>
+      <p>输入主密码打开你的 key 保险箱。</p>
+      <label class="field"><span>主密码</span><input class="input" type="password" id="pw" autocomplete="current-password" required></label>
+      <div class="err" id="unlockErr"></div>
+      <button class="btn primary block" type="submit" id="unlockBtn">解锁</button>
+    </form>
+    <div id="tokenErr" class="hidden"><h1>页面已失效</h1><p>请关掉这个标签页，重新双击「AI Key 管家」打开。</p></div>
+  </div>
+</section>
+
+<!-- 主界面 -->
+<section id="main" class="hidden">
+  <div class="top"><div class="top-in">
+    <div class="logo"><div class="logo-mark"><svg width="18" height="18" viewBox="0 0 32 32"><circle cx="12" cy="16" r="5" fill="none" stroke="#fff" stroke-width="3"/><path d="M17 16h9v4M22 16v3" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/></svg></div>AI Key 管家</div>
+    <button class="btn sm" id="lockBtn" title="锁定后需要重新输入主密码">🔒 锁定</button>
+  </div></div>
+  <div class="wrap">
+    <div class="stats">
+      <div class="stat"><div class="k">全部 key</div><div class="v" id="sTotal">0</div></div>
+      <div class="stat"><div class="k">有效</div><div class="v" id="sValid">0</div></div>
+      <div class="stat"><div class="k">可查到的余额</div><div class="v" id="sBal">—</div></div>
+      <div class="stat" id="sAttnBox"><div class="k">需要处理（无效 / 已过期 / 7 天内到期）</div><div class="v" id="sAttn">0</div></div>
+    </div>
+    <div class="toolbar">
+      <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="input" id="q" placeholder="搜索名称、备注、厂商…"></div>
+      <select class="input" id="fProv"><option value="">全部厂商</option></select>
+      <button class="btn" id="checkAllBtn">↻ 全部检测</button>
+      <button class="btn" id="scanBtn">🔍 扫描电脑找回</button>
+      <button class="btn primary" id="addBtn">＋ 添加 key</button>
+    </div>
+    <div class="list" id="list"></div>
+    <div class="hint" style="text-align:center;margin-top:18px" id="footHint"></div>
+  </div>
+</section>
+
+<!-- 添加 / 编辑 -->
+<div class="mask hidden" id="editModal"><div class="modal">
+  <header><h2 id="editTitle">添加 key</h2><button class="icon-btn" data-close>✕</button></header>
+  <form id="editForm"><div class="body">
+    <label class="field" id="keyField"><span>API key</span><textarea class="input" id="eKey" rows="2" placeholder="粘贴 key，例如 sk-…" spellcheck="false" autocomplete="off"></textarea></label>
+    <div class="detected" id="eDetected"></div>
+    <label class="field"><span>厂商</span><select class="input" id="eProv"></select></label>
+    <div class="grid2">
+      <label class="field"><span>名称（可选）</span><input class="input" id="eName" placeholder="例如：个人项目"></label>
+      <label class="field"><span>到期日（可选）</span><input class="input" id="eExp" type="date"></label>
+    </div>
+    <label class="field"><span>备注（可选）</span><input class="input" id="eNote" placeholder="例如：Cursor 在用 / 给 xx 项目"></label>
+    <div class="err" id="editErr"></div>
+  </div>
+  <footer><button type="button" class="btn" data-close>取消</button><button class="btn primary" type="submit" id="editSave">保存</button></footer>
+  </form>
+</div></div>
+
+<!-- 扫描 -->
+<div class="mask hidden" id="scanModal"><div class="modal wide">
+  <header><h2>扫描电脑找回 key</h2><button class="icon-btn" data-close>✕</button></header>
+  <div class="body">
+    <div class="scan-prog" id="scanProg"></div>
+    <div id="scanRes"></div>
+  </div>
+  <footer><button class="btn" data-close>关闭</button><button class="btn primary" id="importBtn" disabled>导入选中的 key</button></footer>
+</div></div>
+
+<!-- 确认 -->
+<div class="mask hidden" id="confirmModal"><div class="modal" style="max-width:420px">
+  <header><h2 id="cTitle">确认</h2></header>
+  <div class="body"><p id="cText" style="margin:0;color:var(--ink2)"></p></div>
+  <footer><button class="btn" data-close>取消</button><button class="btn primary" id="cOk">确定</button></footer>
+</div></div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script>
+"use strict";
+// ───────── 令牌：只在启动时通过地址栏 # 后面传进来，拿到后立刻从地址栏抹掉 ─────────
+let TOKEN = "";
+(function () {
+  const m = location.hash.match(/t=([0-9a-f]+)/);
+  if (m) {
+    TOKEN = m[1];
+    try { sessionStorage.setItem("akv_t", TOKEN); } catch (e) {}
+    history.replaceState(null, "", location.pathname);
+  } else {
+    try { TOKEN = sessionStorage.getItem("akv_t") || ""; } catch (e) {}
+  }
+})();
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method, headers: { "X-Token": TOKEN, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (res.status === 401) { showGate("token"); throw new Error(data.error || "令牌无效"); }
+  if (res.status === 423) { showGate("unlock"); throw new Error("已锁定"); }
+  if (!res.ok) throw new Error(data.error || "出错了");
+  return data;
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add("hidden"), 2200);
+}
+
+async function copyText(s) {
+  try { await navigator.clipboard.writeText(s); return true; }
+  catch (e) {
+    const ta = document.createElement("textarea"); ta.value = s; document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand("copy"); ta.remove(); return ok;
+  }
+}
+
+// ───────── 锁屏 ─────────
+function showGate(mode) {
+  $("#main").classList.add("hidden"); $("#gate").classList.remove("hidden");
+  document.querySelectorAll(".mask").forEach((m) => m.classList.add("hidden"));
+  $("#setupForm").classList.toggle("hidden", mode !== "setup");
+  $("#unlockForm").classList.toggle("hidden", mode !== "unlock");
+  $("#tokenErr").classList.toggle("hidden", mode !== "token");
+  if (mode === "setup") $("#pw1").focus();
+  if (mode === "unlock") { $("#pw").value = ""; $("#pw").focus(); }
+}
+
+$("#setupForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const a = $("#pw1").value, b = $("#pw2").value;
+  if (a.length < 8) return ($("#setupErr").textContent = "主密码至少 8 位");
+  if (a !== b) return ($("#setupErr").textContent = "两次输入不一样");
+  try { await api("POST", "/api/setup", { password: a }); enterMain(); }
+  catch (err) { $("#setupErr").textContent = err.message; }
+});
+
+$("#unlockForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = $("#unlockBtn"); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 解锁中…';
+  try { await api("POST", "/api/unlock", { password: $("#pw").value }); $("#unlockErr").textContent = ""; enterMain(); }
+  catch (err) { $("#unlockErr").textContent = err.message; $("#pw").select(); }
+  finally { btn.disabled = false; btn.textContent = "解锁"; }
+});
+
+$("#lockBtn").addEventListener("click", async () => { await api("POST", "/api/lock"); showGate("unlock"); });
+
+// ───────── 主界面 ─────────
+let ENTRIES = [], PROVIDERS = [];
+
+async function enterMain() {
+  $("#gate").classList.add("hidden"); $("#main").classList.remove("hidden");
+  await load();
+}
+
+async function load() {
+  const d = await api("GET", "/api/entries");
+  ENTRIES = d.entries; PROVIDERS = d.providers;
+  fillProviderSelects(); render();
+}
+
+function provName(id) { return (PROVIDERS.find((p) => p.id === id) || {}).name || id; }
+
+const COLORS = { deepseek: "#4d6bfe", moonshot: "#111111", dashscope: "#615ced", zhipu: "#3859ff", ark: "#1f6fff", siliconflow: "#7c3aed",
+  minimax: "#e8484c", hunyuan: "#0052d9", qianfan: "#2468f2", stepfun: "#0b8a7a", baichuan: "#f06b1d", openai: "#10a37f",
+  anthropic: "#c96442", gemini: "#1a73e8", openrouter: "#6467f2", groq: "#f55036", xai: "#222222", unknown: "#8f8c84" };
+function badge(e) {
+  const unsure = e.candidates && e.candidates.length > 1;
+  const id = unsure ? "unknown" : e.provider;
+  const label = unsure ? "?" : (provName(id).match(/[A-Za-z一-龥]/) || ["?"])[0].toUpperCase();
+  return `<div class="dot" style="background:${COLORS[id] || COLORS.unknown}">${esc(label)}</div>`;
+}
+
+function fillProviderSelects() {
+  const opts = PROVIDERS.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+  const cur = $("#fProv").value;
+  const used = new Set(ENTRIES.map((e) => e.provider));
+  $("#fProv").innerHTML = '<option value="">全部厂商</option>' + PROVIDERS.filter((p) => used.has(p.id)).map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+  $("#fProv").value = cur;
+  $("#eProv").innerHTML = '<option value="">自动识别</option>' + opts;
+}
+
+const STATUS = { valid: "有效", invalid: "已失效", neterr: "网络不通", error: "检测出错", unsupported: "无法检测", "": "未检测" };
+
+function daysLeft(d) { if (!d) return null; return Math.ceil((new Date(d + "T23:59:59") - new Date()) / 864e5); }
+function ago(ts) {
+  if (!ts) return ""; const s = Date.now() / 1000 - ts;
+  if (s < 60) return "刚刚"; if (s < 3600) return Math.floor(s / 60) + " 分钟前";
+  if (s < 86400) return Math.floor(s / 3600) + " 小时前"; return Math.floor(s / 86400) + " 天前";
+}
+function money(a, c) {
+  if (a == null) return "";
+  const sym = c === "CNY" ? "¥" : c === "USD" ? "$" : "";
+  return sym + Number(a).toFixed(2) + (sym ? "" : " " + (c || ""));
+}
+function needsAttention(e) { const d = daysLeft(e.expires); return e.status === "invalid" || (d !== null && d <= 7); }
+
+function render() {
+  // 统计
+  $("#sTotal").textContent = ENTRIES.length;
+  $("#sValid").textContent = ENTRIES.filter((e) => e.status === "valid").length;
+  const sums = {};
+  ENTRIES.forEach((e) => { if (e.amount != null && e.status === "valid") sums[e.currency] = (sums[e.currency] || 0) + e.amount; });
+  const parts = Object.entries(sums).map(([c, a]) => money(a, c));
+  $("#sBal").innerHTML = parts.length ? parts.map(esc).join('<small> · </small>') : "—";
+  const attn = ENTRIES.filter(needsAttention).length;
+  $("#sAttn").textContent = attn; $("#sAttnBox").classList.toggle("alert", attn > 0);
+
+  const list = $("#list");
+  if (!ENTRIES.length) {
+    list.innerHTML = `<div class="empty"><h3>保险箱还是空的</h3><p>先把你手上的 key 放进来。</p><div class="opts">
+      <button class="opt" data-act="scan"><b>🔍 扫描电脑找回</b><span>自动找出这台电脑上配置文件、项目、环境变量里的 key</span></button>
+      <button class="opt" data-act="add"><b>＋ 手动添加</b><span>从厂商控制台复制 key，粘贴进来</span></button></div></div>`;
+    $("#footHint").textContent = ""; return;
+  }
+  const q = $("#q").value.trim().toLowerCase(), fp = $("#fProv").value;
+  const rows = ENTRIES.filter((e) => (!fp || e.provider === fp) &&
+    (!q || [e.name, e.note, e.providerName, e.masked, e.source].join(" ").toLowerCase().includes(q)));
+  // 需要处理的排前面，其次有效的
+  const rank = (e) => (needsAttention(e) ? 0 : e.status === "valid" ? 1 : 2);
+  rows.sort((a, b) => rank(a) - rank(b));
+
+  let html = `<div class="row head"><div>厂商 / 名称</div><div>Key</div><div>状态</div><div>余额</div><div>到期</div><div></div></div>`;
+  if (!rows.length) html += `<div class="empty"><p>没有符合条件的 key</p></div>`;
+  for (const e of rows) {
+    const d = daysLeft(e.expires);
+    const expCls = d === null ? "" : d < 0 ? "past" : d <= 7 ? "soon" : "";
+    const expTxt = d === null ? '<span class="sub">—</span>' : `<span class="exp ${expCls}">${esc(e.expires)}</span><div class="sub">${d < 0 ? "已过期" : d === 0 ? "今天到期" : d + " 天后"}</div>`;
+    const st = e.status || "";
+    const bal = e.amount != null ? `<span class="bal ${e.amount < 5 ? "low" : ""}">${esc(money(e.amount, e.currency))}</span>`
+      : `<span class="sub">${esc(st === "valid" ? "去控制台看" : "—")}</span>`;
+    const title = e.name || (e.source && e.source !== "手动添加" ? "扫描导入" : "未命名");
+    html += `<div class="row" data-id="${e.id}">
+      <div class="prov">${badge(e)}<div class="t"><div class="n" title="${esc(e.providerName)}">${esc(e.providerName)}</div>
+        <div class="s" title="${esc(e.note || e.source)}">${esc(title)}${e.note ? " · " + esc(e.note) : ""}</div></div></div>
+      <div class="keycell"><code data-k="${e.id}">${esc(e.masked)}</code>
+        <button class="icon-btn" data-act="reveal" title="显示完整 key">👁</button>
+        <button class="icon-btn" data-act="copy" title="复制 key">⧉</button></div>
+      <div><span class="pill ${st || "none"}" title="${esc(e.checkNote)}">${STATUS[st] || st}</span>${e.checkedAt ? `<div class="sub">${ago(e.checkedAt)}</div>` : ""}</div>
+      <div>${bal}</div>
+      <div>${expTxt}</div>
+      <div class="acts">
+        <button class="icon-btn" data-act="check" title="检测">↻</button>
+        ${e.baseUrl ? `<button class="icon-btn" data-act="base" title="复制接口地址 ${esc(e.baseUrl)}">🔗</button>` : ""}
+        ${e.console ? `<a class="icon-btn" href="${esc(e.console)}" target="_blank" rel="noopener noreferrer" title="打开控制台">↗</a>` : ""}
+        <button class="icon-btn" data-act="edit" title="编辑">✎</button>
+        <button class="icon-btn" data-act="del" title="删除">🗑</button>
+      </div></div>`;
+  }
+  list.innerHTML = html;
+  const unsure = ENTRIES.filter((e) => e.candidates && e.candidates.length > 1).length;
+  $("#footHint").textContent = unsure ? `有 ${unsure} 个 key 还不确定是哪家的，点「全部检测」后会自动确定。` : "";
+}
+
+$("#q").addEventListener("input", render);
+$("#fProv").addEventListener("change", render);
+
+// 列表里的按钮
+document.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("[data-act]"); if (!btn) return;
+  const act = btn.dataset.act, row = btn.closest(".row"), id = row && row.dataset.id;
+  const e = ENTRIES.find((x) => x.id === id);
+  try {
+    if (act === "add") openEdit();
+    else if (act === "scan") openScan();
+    else if (act === "copy") { const r = await api("GET", `/api/entries/${id}/reveal`); toast((await copyText(r.key)) ? "已复制 key" : "复制失败"); }
+    else if (act === "base") { await copyText(e.baseUrl); toast("已复制接口地址：" + e.baseUrl); }
+    else if (act === "reveal") {
+      const code = row.querySelector("code");
+      if (code.classList.contains("revealed")) { code.textContent = e.masked; code.classList.remove("revealed"); return; }
+      const r = await api("GET", `/api/entries/${id}/reveal`);
+      code.textContent = r.key; code.classList.add("revealed");
+      setTimeout(() => { if (code.isConnected) { code.textContent = e.masked; code.classList.remove("revealed"); } }, 10000);
+    }
+    else if (act === "check") { btn.innerHTML = '<span class="spin"></span>'; await runCheck([id]); }
+    else if (act === "edit") openEdit(e);
+    else if (act === "del") {
+      if (await confirmBox("删除这个 key？", `${e.providerName} ${e.masked}\n只是从管家里删除，不会影响厂商那边。如果确定不用了，记得也去厂商控制台删掉。`, "删除"))
+        { await api("DELETE", `/api/entries/${id}`); toast("已删除"); await load(); }
+    }
+  } catch (err) { if (err.message !== "已锁定") toast(err.message); }
+});
+
+async function runCheck(ids) {
+  const d = await api("POST", "/api/check", { ids });
+  ENTRIES = d.entries; fillProviderSelects(); render();
+  if (ids.length === 0) {
+    const v = ENTRIES.filter((e) => e.status === "valid").length, bad = ENTRIES.filter((e) => e.status === "invalid").length;
+    toast(`检测完成：${v} 个有效${bad ? "，" + bad + " 个已失效" : ""}`);
+  }
+}
+
+$("#checkAllBtn").addEventListener("click", async () => {
+  if (!ENTRIES.length) return toast("还没有 key");
+  const b = $("#checkAllBtn"); b.disabled = true; b.innerHTML = '<span class="spin"></span> 检测中…';
+  try { await runCheck([]); } catch (err) { toast(err.message); }
+  finally { b.disabled = false; b.textContent = "↻ 全部检测"; }
+});
+
+// ───────── 添加 / 编辑 ─────────
+let editing = null;
+function openEdit(e) {
+  editing = e || null;
+  $("#editTitle").textContent = e ? "编辑" : "添加 key";
+  $("#keyField").classList.toggle("hidden", !!e);
+  $("#eKey").value = ""; $("#eDetected").textContent = e ? `Key：${e.masked}` : "";
+  $("#eProv").value = e && !(e.candidates && e.candidates.length > 1) ? e.provider : "";
+  $("#eName").value = e ? e.name : ""; $("#eNote").value = e ? e.note : ""; $("#eExp").value = e ? e.expires : "";
+  $("#editErr").textContent = "";
+  $("#editModal").classList.remove("hidden");
+  setTimeout(() => (e ? $("#eName") : $("#eKey")).focus(), 30);
+}
+let detectTimer;
+$("#eKey").addEventListener("input", () => {
+  clearTimeout(detectTimer);
+  detectTimer = setTimeout(async () => {
+    const k = $("#eKey").value.trim();
+    if (k.length < 16) return ($("#eDetected").textContent = "");
+    const d = await api("POST", "/api/detect", { key: k });
+    const c = d.candidates;
+    $("#eDetected").textContent = c[0] === "unknown" ? "没认出是哪家的，可以在下面手动选择"
+      : c.length === 1 ? "识别为：" + provName(c[0]) : "可能是：" + c.map(provName).join(" / ") + "（保存后自动检测确定）";
+  }, 250);
+});
+$("#editForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const body = { provider: $("#eProv").value, name: $("#eName").value, note: $("#eNote").value, expires: $("#eExp").value };
+  const save = $("#editSave"); save.disabled = true;
+  try {
+    if (editing) { await api("PUT", `/api/entries/${editing.id}`, body); closeModals(); toast("已保存"); await load(); }
+    else {
+      body.key = $("#eKey").value;
+      const r = await api("POST", "/api/entries", body);
+      closeModals(); toast("已添加，正在检测…"); await load();
+      await runCheck([r.id]); // 添加后马上检测一次，顺便确定厂商
+      const e = ENTRIES.find((x) => x.id === r.id);
+      if (e) toast(`${e.providerName}：${STATUS[e.status] || "未检测"}${e.amount != null ? "，余额 " + money(e.amount, e.currency) : ""}`);
+    }
+  } catch (err) { $("#editErr").textContent = err.message; }
+  finally { save.disabled = false; }
+});
+$("#addBtn").addEventListener("click", () => openEdit());
+
+// ───────── 扫描 ─────────
+let scanTimer = null, scanData = null;
+async function openScan() {
+  $("#scanModal").classList.remove("hidden");
+  $("#scanRes").innerHTML = ""; $("#importBtn").disabled = true;
+  await api("POST", "/api/scan/start");
+  pollScan();
+}
+async function pollScan() {
+  clearTimeout(scanTimer);
+  try { scanData = await api("GET", "/api/scan/status"); } catch (e) { return; }
+  const s = scanData;
+  $("#scanProg").innerHTML = s.running
+    ? `<b>正在扫描…</b> 已检查 ${s.files} 个文件，找到 ${s.results.length} 个 key<div class="cur">${esc(s.current)}</div><div class="bar"><i></i></div>`
+    : `<b>扫描完成</b>：检查了 ${s.files} 个文件和系统环境变量，找到 ${s.results.length} 个 key。<div class="sub" style="margin-top:4px">只读扫描，没有修改任何文件。没找到的 key 可以去厂商控制台重新生成后手动添加。</div>`;
+  renderScanResults();
+  if (s.running && !$("#scanModal").classList.contains("hidden")) scanTimer = setTimeout(pollScan, 800);
+}
+const checkedScan = new Set();
+function renderScanResults() {
+  const r = scanData.results;
+  if (!r.length) { $("#scanRes").innerHTML = scanData.running ? "" : '<div class="empty" style="padding:24px"><p>这台电脑上没有找到 API key。</p></div>'; return; }
+  r.forEach((f) => { if (!f.inVault && !f._seen) { checkedScan.add(f.id); f._seen = true; } });
+  $("#scanRes").innerHTML = '<div class="found">' + r.map((f) => {
+    const names = f.providers.map(provName).join(" / ") + (f.sure ? "" : " ?");
+    return `<label class="frow ${f.inVault ? "dim" : ""}">
+      <input type="checkbox" data-fid="${f.id}" ${f.inVault ? "disabled" : checkedScan.has(f.id) ? "checked" : ""}>
+      <div><code>${esc(f.masked)}</code>${f.inVault ? ' <span class="sub">已在保险箱</span>' : ""}
+        <div class="locs">${f.locations.slice(0, 3).map(esc).join("<br>")}${f.locations.length > 3 ? "<br>…共 " + f.locations.length + " 处" : ""}</div></div>
+      <div>${esc(names)}</div></label>`;
+  }).join("") + "</div>";
+  updateImportBtn();
+}
+document.addEventListener("change", (ev) => {
+  const id = ev.target.dataset && ev.target.dataset.fid; if (!id) return;
+  ev.target.checked ? checkedScan.add(id) : checkedScan.delete(id); updateImportBtn();
+});
+function updateImportBtn() {
+  const ids = (scanData ? scanData.results : []).filter((f) => !f.inVault && checkedScan.has(f.id)).map((f) => f.id);
+  const b = $("#importBtn"); b.disabled = !ids.length; b.textContent = ids.length ? `导入选中的 ${ids.length} 个 key` : "导入选中的 key";
+  return ids;
+}
+$("#importBtn").addEventListener("click", async () => {
+  const ids = updateImportBtn();
+  const r = await api("POST", "/api/scan/import", { ids });
+  closeModals(); toast(`已导入 ${r.imported} 个 key，正在检测…`); await load();
+  try { await runCheck([]); } catch (e) {}
+});
+$("#scanBtn").addEventListener("click", openScan);
+
+// ───────── 通用弹窗 ─────────
+let pendingConfirm = null;
+function closeModals() {
+  document.querySelectorAll(".mask").forEach((m) => m.classList.add("hidden")); clearTimeout(scanTimer);
+  if (pendingConfirm) { const r = pendingConfirm; pendingConfirm = null; r(false); }
+}
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-close]")) closeModals();
+  else if (e.target.classList.contains("mask") && e.target.id !== "confirmModal") closeModals();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModals(); });
+
+function confirmBox(title, text, okText) {
+  return new Promise((resolve) => {
+    $("#cTitle").textContent = title; $("#cText").innerText = text; $("#cOk").textContent = okText || "确定";
+    const m = $("#confirmModal"); m.classList.remove("hidden");
+    pendingConfirm = resolve;
+    const done = (v) => { pendingConfirm = null; m.classList.add("hidden"); $("#cOk").onclick = null; m.querySelector("[data-close]").onclick = null; resolve(v); };
+    $("#cOk").onclick = () => done(true);
+    m.querySelector("[data-close]").onclick = (ev) => { ev.stopPropagation(); done(false); };
+  });
+}
+
+// ───────── 启动 ─────────
+(async function start() {
+  if (!TOKEN) return showGate("token");
+  try {
+    const s = await api("GET", "/api/state");
+    if (!s.exists) showGate("setup"); else if (!s.unlocked) showGate("unlock"); else enterMain();
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
